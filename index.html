@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>EKITIMER — Timer de speedcubing WCA</title>
+<meta name="description" content="Timer de speedcubing gratuito y sin cuenta: scrambles oficiales WCA, inspección, simulador de rondas de competición, importación desde csTimer y Twisty Timer, y funciona sin conexión.">
+<meta name="theme-color" content="#ff6b35">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:title" content="EKITIMER — Timer de speedcubing WCA">
+<meta property="og:description" content="Simula rondas de competición WCA, importa tus tiempos de csTimer y entrena sin conexión.">
+<meta property="og:image" content="https://ekaitz-rey-gonzalez.github.io/ekitimer/docs/screenshots/escritorio.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=IBM+Plex+Mono:wght@400;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">
+      <div class="logo-cube"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="logo-text">EKI<em>TIMER</em></div>
+    </div>
+    <div class="header-controls">
+      <div class="select-wrap"><select id="category" title="Categoría"></select></div>
+      <div class="select-wrap"><select id="session" title="Sesión"></select></div>
+      <button class="theme-btn" id="compBtn" title="Modo competición">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+        <span class="lbl" id="compBtnLbl">Competición</span>
+      </button>
+      <button class="theme-btn" id="dataBtn" title="Copias, importar y Excel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+        <span class="lbl">Datos</span><span class="dot" id="dataDot" hidden></span>
+      </button>
+      <div class="pop-anchor">
+        <button class="theme-btn" id="settingsToggle" title="Ajustes">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="lbl">Ajustes</span>
+        </button>
+        <div class="theme-popup settings-popup" id="settingsPopup">
+          <label class="set-row"><input type="checkbox" id="setInsp"> Inspección antes de cada solve</label>
+          <div class="set-row set-sub">Duración
+            <div class="select-wrap sm"><select id="setInspDur">
+              <option value="8">8 s</option><option value="10">10 s</option><option value="12">12 s</option>
+              <option value="15">15 s (WCA)</option><option value="20">20 s</option><option value="30">30 s</option>
+              <option value="45">45 s</option><option value="60">60 s</option>
+            </select></div>
+          </div>
+          <label class="set-row"><input type="checkbox" id="setBeep"> Avisos sonoros durante la inspección</label>
+          <label class="set-row"><input type="checkbox" id="setFocus"> Modo foco al resolver</label>
+          <label class="set-row"><input type="checkbox" id="setRs"> Scrambles de estado aleatorio</label>
+          <label class="set-row"><input type="checkbox" id="setWake"> Mantener la pantalla encendida</label>
+          <div class="set-row set-sub">Tamaño del scramble
+            <div class="seg" id="setScrSize">
+              <button data-v="s">S</button><button data-v="m">M</button><button data-v="l">L</button><button data-v="xl">XL</button>
+            </div>
+          </div>
+          <div class="set-help">
+            <b>Ctrl+Z</b> deshacer · <b>Alt+Z</b> borrar último<br>
+            <b>Alt+1 / 2 / 3</b> último: OK / +2 / DNF<br>
+            <b>Esc</b> cancelar inspección · cualquier tecla para parar
+          </div>
+          <div class="set-about">EKITIMER <span id="appVersion"></span> · <a href="https://github.com/ekaitz-rey-gonzalez/ekitimer" target="_blank" rel="noopener">Código en GitHub</a></div>
+        </div>
+      </div>
+      <div class="pop-anchor">
+        <button class="theme-btn" id="themeToggle" title="Tema">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <span class="lbl">Tema</span>
+        </button>
+        <div class="theme-popup" id="themePopup">
+          <button class="theme-option active" data-theme="cream"><span class="theme-dot" style="background:#f0ece3"></span>Crema</button>
+          <button class="theme-option" data-theme="dark"><span class="theme-dot" style="background:#262640"></span>Oscuro</button>
+          <button class="theme-option" data-theme="ocean"><span class="theme-dot" style="background:#cce5ee"></span>Océano</button>
+          <button class="theme-option" data-theme="sakura"><span class="theme-dot" style="background:#f5dce2"></span>Sakura</button>
+          <button class="theme-option" data-theme="midnight"><span class="theme-dot" style="background:#1e293b"></span>Medianoche</button>
+          <button class="theme-option" data-theme="forest"><span class="theme-dot" style="background:#d4dfc8"></span>Bosque</button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main>
+    <div class="banner" id="banner" hidden></div>
+    <div class="scramble-box">
+      <div class="scramble-top">
+        <div class="scramble-top-left">
+          <div class="scramble-label" id="scrambleLabel">Scramble</div>
+          <span class="scr-src" id="scrSrc"></span>
+        </div>
+        <div class="scramble-tools">
+          <label class="mbld-ctl" id="mbldCtl" hidden>Cubos <input type="number" id="mbldCount" min="2" max="60" value="3"></label>
+          <button class="scramble-refresh" id="copyScrambleBtn" title="Copiar scramble">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="scramble-refresh" id="newScrambleBtn" title="Nuevo scramble">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="scramble-text" id="scrambleText">Cargando...</div>
+    </div>
+    <div class="cube-vis-wrapper" id="cubeVisWrapper">
+      <div class="cube-net" id="cubeNet"></div>
+    </div>
+    <div class="timer-area">
+      <div class="timer-display idle" id="timer">0.00</div>
+      <div class="timer-hint" id="hint"></div>
+    </div>
+    <div class="manual-input-row">
+      <input type="text" id="manualInput" autocomplete="off" inputmode="decimal">
+      <button class="btn-add" id="addManualBtn">+ Añadir</button>
+    </div>
+    <div class="stats-bar" id="statsBar"></div>
+  </main>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="tabs">
+        <button class="tab active" data-tab="times">Tiempos <span class="times-badge" id="timesCount">0</span></button>
+        <button class="tab" data-tab="chart">Gráfica</button>
+        <button class="tab" data-tab="rounds">Rondas</button>
+      </div>
+    </div>
+    <div class="list-tools" id="listTools"></div>
+    <div class="times-list" id="timesList"></div>
+    <div class="chart-box" id="chartBox" hidden>
+      <canvas id="chart"></canvas>
+      <div class="chart-legend" id="chartLegend"></div>
+    </div>
+    <div class="times-list" id="roundsList" hidden></div>
+  </div>
+</div>
+
+<!-- Vaciar sesión -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>¿Vaciar esta sesión?</h3>
+    <p>Se eliminarán todos los tiempos de la sesión actual. Podrás deshacerlo justo después.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="modalCancel">Cancelar</button>
+      <button class="btn btn-danger" id="modalConfirm">Sí, vaciar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detalle de un solve -->
+<div class="modal-overlay" id="detailOverlay">
+  <div class="modal modal-detail">
+    <div class="detail-head">
+      <div class="detail-time" id="dTime"></div>
+      <button class="icon-btn" id="dClose" title="Cerrar">✕</button>
+    </div>
+    <div class="detail-meta" id="dMeta"></div>
+    <div class="pen-row" id="dPen"></div>
+    <div class="detail-label">Scramble <button class="mini-btn" id="dCopy">Copiar</button></div>
+    <div class="detail-scr" id="dScr"></div>
+    <div class="detail-label">Sesión</div>
+    <div class="select-wrap full"><select id="dSess"></select></div>
+    <div class="detail-label">Comentario</div>
+    <textarea id="dComment" rows="2" placeholder="Notas sobre este solve…"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="dDelete">Eliminar</button>
+      <button class="btn btn-outline" id="dDone">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Preparar ronda de competición -->
+<div class="modal-overlay" id="compOverlay">
+  <div class="modal">
+    <h3>Ronda de competición</h3>
+    <p id="compDesc"></p>
+    <div class="field">
+      <label for="compTarget" id="compTargetLbl">Objetivo</label>
+      <input type="text" id="compTarget" autocomplete="off">
+      <small id="compTargetHelp"></small>
+    </div>
+    <div class="field" id="compCutRow">
+      <label for="compCutoff">Corte</label>
+      <input type="text" id="compCutoff" autocomplete="off" placeholder="opcional, ej: 1:00">
+      <small id="compCutHelp"></small>
+    </div>
+    <div class="field" id="compLimRow">
+      <label for="compLimit">Límite de tiempo por intento</label>
+      <input type="text" id="compLimit" autocomplete="off" placeholder="opcional, ej: 10:00">
+      <small>Si un intento llega al límite, cuenta como DNF.</small>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="compCancel">Cancelar</button>
+      <button class="btn btn-accent" id="compStart">Empezar ronda</button>
+    </div>
+  </div>
+</div>
+
+<!-- Resultado de una ronda -->
+<div class="modal-overlay" id="roundOverlay">
+  <div class="modal modal-round">
+    <div class="detail-head">
+      <div class="round-kicker" id="rKicker"></div>
+      <button class="icon-btn" id="rClose" title="Cerrar">✕</button>
+    </div>
+    <div class="round-big" id="rBig"></div>
+    <div class="round-fmt" id="rFmt"></div>
+    <div class="round-times" id="rTimes"></div>
+    <div class="round-notes" id="rNotes"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="rDelete">Eliminar ronda</button>
+      <button class="btn btn-outline" id="rCopy">Copiar resultado</button>
+      <button class="btn btn-accent" id="rAgain">Nueva ronda</button>
+    </div>
+  </div>
+</div>
+
+<!-- Datos: copias, importar, Excel -->
+<div class="modal-overlay" id="dataOverlay">
+  <div class="modal modal-data">
+    <div class="detail-head">
+      <h3>Tus datos</h3>
+      <button class="icon-btn" id="dataClose" title="Cerrar">✕</button>
+    </div>
+    <div class="data-sec">
+      <div class="data-title">Copia de seguridad</div>
+      <p id="bkInfo"></p>
+      <button class="btn btn-accent" id="bkDownload">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar copia
+      </button>
+    </div>
+    <div class="data-sec">
+      <div class="data-title">Importar o restaurar</div>
+      <p>Restaura una copia de EKITIMER o trae tus tiempos de <b>csTimer</b>, <b>Twisty Timer</b> o <b>Cubic Timer</b>. Los tiempos que ya tengas no se duplican.</p>
+      <details class="how">
+        <summary>¿Cómo exporto desde otro timer?</summary>
+        <ul>
+          <li><b>csTimer:</b> botón «Exportar» → «Exportar a archivo».</li>
+          <li><b>Twisty Timer / Cubic Timer:</b> menú → «Importar/Exportar» → «Exportar copia de seguridad».</li>
+        </ul>
+      </details>
+      <button class="btn btn-outline" id="impBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Elegir archivo…
+      </button>
+      <input type="file" id="impFile" accept=".json,.txt,.csv,application/json,text/plain,text/csv" hidden>
+      <div class="imp-plan" id="impPlan" hidden></div>
+    </div>
+    <div class="data-sec">
+      <div class="data-title">Excel</div>
+      <p>Una hoja por categoría con tiempos en segundos, más tus rondas de competición.</p>
+      <button class="btn btn-excel" id="exportXlsxBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar Excel
+      </button>
+    </div>
+    <div class="data-note" id="storageInfo"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo">Deshacer</button></div>
+
+<script src="js/puzzles.js"></script>
+<script src="js/core.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

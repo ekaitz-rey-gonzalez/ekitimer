@@ -1,0 +1,22 @@
+{
+  "name": "ekitimer",
+  "version": "1.0.0",
+  "description": "Timer de speedcubing con scrambles WCA, simulador de rondas de competición e importación desde csTimer y Twisty Timer.",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node tests/server.js",
+    "test": "node --test \"tests/unit/*.test.{js,mjs}\"",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0",
+    "cubing": "^0.65.1",
+    "xlsx": "^0.18.5"
+  }
+}

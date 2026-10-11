@@ -1,0 +1,19 @@
+{
+  "name": "EKITIMER — Timer de speedcubing WCA",
+  "short_name": "EKITIMER",
+  "description": "Timer de speedcubing con scrambles WCA, inspección, simulador de rondas de competición e importación desde csTimer y Twisty Timer.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f0ece3",
+  "theme_color": "#ff6b35",
+  "categories": ["sports", "utilities", "games"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
