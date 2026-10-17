@@ -3,9 +3,9 @@
  * - Páginas: primero la red (para recibir actualizaciones), si no hay, la copia guardada.
  * - Archivos propios y librerías externas: copia guardada al instante y se refresca en segundo plano.
  */
-const VERSION = 'ekitimer-v1.0.0';
+const VERSION = 'ekitimer-v1.1.0';
 const SHELL = [
-  './', 'index.html', 'css/styles.css', 'js/puzzles.js', 'js/core.js', 'js/app.js',
+  './', 'index.html', 'css/styles.css', 'js/puzzles.js', 'js/core.js', 'js/wca.js', 'js/app.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'
 ];
 // Orígenes externos que merece la pena guardar (fuentes, Excel, scrambles oficiales)

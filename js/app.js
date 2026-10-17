@@ -164,6 +164,7 @@ let meta=(()=>{const v=store.get('ekitimer-meta',{});return v&&typeof v==='objec
 let curScr='',curSrc='',tState='idle',startT=0,inspStart=null,holdT=null,holdFrom='idle',rafId=0,beeped={},pendingInsp=null;
 let undoBuf=null,toastT=null,activeTab='times',detailId=null,lastStopAt=0,roundView=null,impPending=null;
 let selMode=false,sel=new Set(),selAnchor=null,animateFirst=false;
+let practice=null; // práctica libre con mezclas oficiales de la WCA
 let mbldN=Math.min(60,Math.max(2,parseInt(store.get('ekitimer-mbld',3))||3));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const plural=(n,a,b)=>n===1?a:b;
@@ -320,6 +321,8 @@ function addManual(){
 function pushSolve(rec){
   const s=Object.assign({id:uid(),scramble:curScr,category:curCat,session:curSess(),date:new Date().toISOString(),comment:''},rec);
   if(s.insp==null)delete s.insp;
+  const w=curSrc==='wca'?wcaCurrent():null;
+  if(w&&w.scramble===curScr)s.wca={c:w.src.compId,cn:w.src.compName,e:w.src.eventId,r:w.src.roundLabel,g:w.src.group,k:w.item.num,x:w.item.extra?1:0};
   let limitHit=false;
   if(comp){
     s.comp=comp.id;
@@ -328,7 +331,14 @@ function pushSolve(rec){
   }
   solves.unshift(s);undoBuf=null;animateFirst=true;
   if(comp&&compCheck())return;
+  if(!comp&&w&&practice&&w.src===practice){
+    practice.done=practice.done||{};practice.done[practice.idx]=s.id;
+    if(practice.idx<practice.list.length-1)practice.idx++;
+    else practice.finished=true;
+    savePractice();
+  }
   save();refreshAll();newScramble();
+  if(practice&&practice.finished&&!comp){practice.finished=false;savePractice();setTimeout(()=>openPracticeSummary(),250);}
   if(limitHit)showToast('Límite de tiempo alcanzado: DNF',false);
 }
 
@@ -336,6 +346,8 @@ function pushSolve(rec){
 let scrTok=0;const pre={};
 const preKey=cat=>cat+(WCA[cat].isMulti?':'+mbldN:'')+(settings.rs?':rs':':rm');
 async function newScramble(){
+  const w=wcaCurrent();
+  if(w){++scrTok;curScr=w.scramble;curSrc='wca';showScramble();return;}
   const tok=++scrTok,cat=curCat,k=preKey(cat);
   updateScrLabel();
   let p=pre[k];delete pre[k];
@@ -353,10 +365,15 @@ function updateScrLabel(){
 function showScramble(){
   const st=$('scrambleText'),src=$('scrSrc'),c=WCA[curCat];
   st.textContent=curScr;st.classList.toggle('multi',!!c.isMulti);
-  src.innerHTML=curSrc==='rs'?'●<span class="lbl"> estado aleatorio</span>':'○<span class="lbl"> movimientos aleatorios</span>';
-  src.className='scr-src'+(curSrc==='rs'?' rs':'');
-  src.title=curSrc==='rs'?'Generado con cubing.js, igual que los scrambles oficiales de la WCA':'Generador local de movimientos aleatorios (sin conexión o desactivado en Ajustes)';
-  updateScrLabel();renderVis();
+  if(curSrc==='wca'){
+    src.innerHTML='★<span class="lbl"> mezcla oficial WCA</span>';src.className='scr-src wca';
+    src.title='Mezcla oficial de una competición de la WCA';
+  }else{
+    src.innerHTML=curSrc==='rs'?'●<span class="lbl"> estado aleatorio</span>':'○<span class="lbl"> movimientos aleatorios</span>';
+    src.className='scr-src'+(curSrc==='rs'?' rs':'');
+    src.title=curSrc==='rs'?'Generado con cubing.js, igual que los scrambles oficiales de la WCA':'Generador local de movimientos aleatorios (sin conexión o desactivado en Ajustes)';
+  }
+  updateScrLabel();renderWcaBar();renderVis();
 }
 function renderVis(){
   const c=WCA[curCat],w=$('cubeVisWrapper');
@@ -533,18 +550,19 @@ function setupTimer(){
 
 // ====== MODO COMPETICIÓN ======
 const compF=r=>COMP_FMT[WCA[r.cat].fmt];
+const cutNOf=r=>r.cutN!=null?r.cutN:compF(r).cutN;
 const compUnits=r=>r.attempts.map(a=>unitsOf(r.cat,a.time,a.penalty));
 // Devuelve true si la ronda ha terminado (y la cierra)
 function compCheck(){
   if(!comp)return false;
   const F=compF(comp),u=compUnits(comp);
-  const cut=cutoffFailed(u,F.cutN,comp.cutoff);
+  const cut=cutoffFailed(u,cutNOf(comp),comp.cutoff);
   if(cut||u.length>=F.n){finishRound();return true;}
   return false;
 }
 function scoreRound(r){
   const F=compF(r),u=compUnits(r);
-  r.cutFail=cutoffFailed(u,F.cutN,r.cutoff);
+  r.cutFail=cutoffFailed(u,cutNOf(r),r.cutoff);
   r.result=r.cutFail||u.length<F.n?null:roundResult(u.slice(0,F.n),F.type);
   r.best=u.length?Math.min(...u):null;
 }
@@ -628,8 +646,8 @@ function updateCompUI(){
   updateScrLabel();
 }
 function renderCompPanel(){
-  const r=comp,F=compF(r),u=compUnits(r),k=u.length,step=isFmc(r.cat)?100:1;
-  const cut=r.cutoff!=null&&F.cutN?{made:u.slice(0,F.cutN).some(v=>v<r.cutoff)}:null;
+  const r=comp,F=compF(r),u=compUnits(r),k=u.length,step=isFmc(r.cat)?100:1,cutN=cutNOf(r);
+  const cut=r.cutoff!=null&&cutN?{made:u.slice(0,cutN).some(v=>v<r.cutoff)}:null;
   let slots='';
   for(let i=0;i<F.n;i++){
     const a=r.attempts[i];
@@ -637,12 +655,13 @@ function renderCompPanel(){
       const cls=a.penalty==='DNF'?'dnf':a.penalty==='+2'?'plus2':'';
       slots+=`<div class="cp-slot filled" data-id="${a.id}" title="Ver o corregir"><div class="cp-n">${i+1}</div><div class="cp-v ${cls}">${esc(fmtU(r.cat,u[i])+(a.penalty==='+2'?'+':''))}</div></div>`;
     }else{
-      const skip=cut&&!cut.made&&i>=F.cutN;
+      const skip=cut&&!cut.made&&i>=cutN;
       slots+=`<div class="cp-slot${i===k?' cur':''}${skip?' skip':''}"><div class="cp-n">${i+1}</div><div class="cp-v">${i===k?'…':''}</div></div>`;
     }
   }
   const info=[];
-  if(r.target!=null)info.push(`<div class="big">Objetivo: <span class="mono">${F.type==='bo'?'single ':''}sub-${esc(fmtU(r.cat,r.target,F.type!=='bo'))}</span></div>`);
+  if(r.wca&&r.target!=null)info.push(`<div class="big">Objetivo: mejorar tu <span class="mono">${esc(fmtU(r.cat,r.target,F.type!=='bo'))}</span> oficial</div>`);
+  else if(r.target!=null)info.push(`<div class="big">Objetivo: <span class="mono">${F.type==='bo'?'single ':''}sub-${esc(fmtU(r.cat,r.target,F.type!=='bo'))}</span></div>`);
   if(F.type==='bo'){
     const best=k?Math.min(...u):null;
     if(k)info.push(`<div>Mejor hasta ahora: <span class="mono">${esc(fmtU(r.cat,best))}</span></div>`);
@@ -660,18 +679,19 @@ function renderCompPanel(){
   }
   if(cut){
     if(cut.made)info.push('<div class="ok">✓ Corte superado</div>');
-    else info.push(`<div>Corte: baja de <span class="mono">${esc(fmtU(r.cat,r.cutoff))}</span> en ${F.cutN===1?'el primer intento':'los 2 primeros intentos'}</div>`);
+    else info.push(`<div>Corte: baja de <span class="mono">${esc(fmtU(r.cat,r.cutoff))}</span> en ${cutN===1?'el primer intento':`los ${cutN} primeros intentos`}</div>`);
   }
   if(r.limit!=null)info.push(`<div>Límite: <span class="mono">${esc(fmtU(r.cat,r.limit))}</span> por intento</div>`);
-  return`<div class="comp-panel"><div class="cp-head"><div class="cp-title">Ronda<span>${esc(WCA[r.cat].name)} · ${F.label}</span></div><button class="mini-btn" id="cpAbandon">Abandonar</button></div>
+  const sub=r.wca?`${r.wca.compName} · ${r.wca.roundLabel} · ${r.wca.group}`:`${WCA[r.cat].name} · ${F.label}`;
+  return`<div class="comp-panel"><div class="cp-head"><div class="cp-title">${r.wca?'★ Repetición':'Ronda'}<span>${esc(sub)}</span></div><button class="mini-btn" id="cpAbandon">Abandonar</button></div>
     <div class="cp-slots">${slots}</div>${info.length?`<div class="cp-info">${info.join('')}</div>`:''}</div>`;
 }
 function showRound(id,fresh){
   const r=rounds.find(x=>x.id===id);if(!r)return;
   roundView=id;
   const F=compF(r),cat=r.cat;
-  $('rKicker').textContent=fresh?'Ronda terminada':new Date(r.end||r.start).toLocaleString();
-  let big,fmtLine=`${F.label} · ${WCA[cat].name}`;
+  $('rKicker').textContent=(fresh?'Ronda terminada':new Date(r.end||r.start).toLocaleString())+(r.wca?' · '+r.wca.compName:'');
+  let big,fmtLine=r.wca?`${F.label} · ${WCA[cat].name} · ${r.wca.roundLabel} · ${r.wca.group}`:`${F.label} · ${WCA[cat].name}`;
   if(r.cutFail)big='Sin media';
   else if(F.type==='bo')big=fmtU(cat,r.result);
   else big=fmtU(cat,r.result,true);
@@ -681,7 +701,7 @@ function showRound(id,fresh){
   $('rTimes').textContent=roundTimesStr(r);
   const notes=[];
   if(r.cutFail)notes.push(`<div class="bad">No pasaste el corte de ${esc(fmtU(cat,r.cutoff))}</div>`);
-  if(r.target!=null&&!r.cutFail){
+  if(r.target!=null&&!r.cutFail&&!r.wca){
     const hit=r.result!=null&&r.result<r.target;
     if(hit)notes.push(`<div class="ok">🎯 ¡Objetivo sub-${esc(fmtU(cat,r.target,F.type!=='bo'))} conseguido!</div>`);
     else if(r.result!==Infinity&&r.result!=null){
@@ -690,18 +710,21 @@ function showRound(id,fresh){
     }
     else notes.push(`<div class="bad">Objetivo sub-${esc(fmtU(cat,r.target,F.type!=='bo'))} no conseguido</div>`);
   }
+  if(r.wca)notes.push(...wcaRoundNotes(r));
   const prev=prevBestRound(r);
   if(r.result!=null&&r.result!==Infinity&&(prev===null||r.result<prev)&&rounds.filter(x=>x.cat===cat).length>1)notes.push('<div class="pb">🏅 ¡Tu mejor ronda en esta categoría!</div>');
   else if(prev!==null)notes.push(`<div>Tu mejor ronda: ${esc(fmtU(cat,prev,F.type!=='bo'))}</div>`);
   $('rNotes').innerHTML=notes.join('');
   $('rDelete').hidden=!!fresh;
   $('rAgain').hidden=!!comp||cat!==curCat;
+  $('rAgain').textContent=r.wca?'Repetir otra vez':'Nueva ronda';
   $('roundOverlay').classList.add('active');
 }
 function roundShareText(r){
   const F=compF(r);
   const res=r.cutFail?'sin media (corte)':(F.type==='bo'?fmtU(r.cat,r.result):fmtU(r.cat,r.result,true));
-  return`EKITIMER · ${WCA[r.cat].name} ${F.short}: ${res} = ${roundTimesStr(r)}`;
+  const ctx=r.wca?` (mezclas de ${r.wca.compName}, ${r.wca.roundLabel.toLowerCase()})`:'';
+  return`EKITIMER · ${WCA[r.cat].name} ${F.short}${ctx}: ${res} = ${roundTimesStr(r)}`;
 }
 function renderRounds(){
   const list=rounds.filter(r=>r.cat===curCat),el=$('roundsList');
@@ -715,11 +738,11 @@ function renderRounds(){
     const res=r.cutFail?'Sin media':fmtU(r.cat,r.result,!bo);
     const hit=r.target!=null&&!r.cutFail&&r.result!=null&&r.result<r.target;
     let badge='';
-    if(r.target!=null)badge+=`<span class="ri-badge${hit?' ok':''}">sub-${esc(fmtU(r.cat,r.target,!bo))} ${hit?'✓':'✗'}</span>`;
+    if(r.target!=null)badge+=r.wca?`<span class="ri-badge${hit?' ok':''}">${hit?'Mejoraste ✓':'Sin mejorar'}</span>`:`<span class="ri-badge${hit?' ok':''}">sub-${esc(fmtU(r.cat,r.target,!bo))} ${hit?'✓':'✗'}</span>`;
     if(r.result===best&&best!=null)badge+='<span class="ri-badge pb">Mejor</span>';
     badge=`<span class="ri-badges">${badge}</span>`;
     return`<div class="round-item ${hit?'hit':'miss'}" data-rid="${r.id}"><div class="ri-top"><span class="ri-res${r.result===Infinity||r.cutFail?' dnf':''}">${esc(res)} <small style="color:var(--text3);font-weight:600">${F.short}</small></span>${badge}</div>
-      <div class="ri-sub">${esc(roundTimesStr(r))}</div><div class="ri-date">${esc(new Date(r.end||r.start).toLocaleString())}</div></div>`;
+      <div class="ri-sub">${esc(roundTimesStr(r))}</div>${r.wca?`<div class="ri-wca">★ ${esc(r.wca.compName)} · ${esc(r.wca.roundLabel)} · ${esc(r.wca.group)}</div>`:''}<div class="ri-date">${esc(new Date(r.end||r.start).toLocaleString())}</div></div>`;
   }).join('');
 }
 
@@ -842,6 +865,7 @@ function renderDetail(){
   if(s.penalty==='+2')meta.push('Tiempo bruto: '+fmt(s.time));
   if(s.insp!=null)meta.push('Inspección: '+s.insp.toFixed(2)+' s');
   if(s.mbld)meta.push(`${mbldPts(s)} puntos`);
+  if(s.wca)meta.push(`★ Mezcla oficial: ${esc(s.wca.cn)} · ${esc(s.wca.r)} · ${esc(s.wca.g)} · ${s.wca.x?'extra ':'nº '}${esc(s.wca.k)}`);
   if(s.comp){
     const r=comp&&comp.id===s.comp?comp:rounds.find(x=>x.id===s.comp);
     if(r){const i=r.attempts.findIndex(a=>a.id===s.id);if(i>=0)meta.push(`🏆 Intento ${i+1} de ${r===comp?'la ronda en curso':'una ronda'}`);}
@@ -1111,8 +1135,324 @@ async function exportXlsx(){
   XLSX.writeFile(wb,`EKITIMER_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
+// ====== COMPETICIONES WCA: practicar con mezclas oficiales ======
+const WCA_ID_KEY='ekitimer-wca-id';
+let wcaS={id:null,person:null,comps:null,results:null,cache:{},view:'id',err:null,filter:'',comp:null,event:null,round:null,set:null,extras:false};
+
+/** Mezcla oficial que toca ahora (repetición de ronda o práctica libre), o null. */
+function wcaCurrent(){
+  if(comp&&comp.wca&&comp.cat===curCat){
+    const F=compF(comp),i=Math.min(comp.attempts.length,F.n-1),item=comp.wca.list[i];
+    return item?{src:comp.wca,item,scramble:item.scramble,idx:i,n:F.n}:null;
+  }
+  if(!comp&&practice&&practice.cat===curCat){
+    const item=practice.list[practice.idx];
+    return item?{src:practice,item,scramble:item.scramble,idx:practice.idx,n:practice.list.length}:null;
+  }
+  return null;
+}
+function savePractice(){store.set('ekitimer-practice',practice);}
+function loadPractice(){
+  const p=store.get('ekitimer-practice',null);
+  practice=p&&typeof p==='object'&&WCA[p.cat]&&Array.isArray(p.list)&&p.list.length?p:null;
+  if(practice)practice.idx=Math.min(Math.max(0,practice.idx|0),practice.list.length-1);
+}
+function renderWcaBar(){
+  const bar=$('wcaBar'),w=wcaCurrent();
+  if(!w){bar.hidden=true;bar.innerHTML='';return;}
+  bar.hidden=false;
+  const s=w.src,where=`${esc(s.compName)} · ${esc(s.roundLabel)} · ${esc(s.group)}`;
+  const num=w.item.extra?`extra ${w.item.num}`:`${w.idx+1} de ${w.n}`;
+  if(comp&&comp.wca){bar.innerHTML=`<span class="wb-txt">★ <b>${where}</b> · mezcla ${num}</span>`;return;}
+  bar.innerHTML=`<span class="wb-txt">★ <b>${where}</b> · mezcla ${num}</span>
+    <span class="wb-nav"><button class="mini-btn" id="wbPrev" ${w.idx?'':'disabled'} title="Mezcla anterior">‹</button><button class="mini-btn" id="wbNext" ${w.idx<w.n-1?'':'disabled'} title="Mezcla siguiente">›</button><button class="mini-btn" id="wbExit" title="Dejar de usar mezclas oficiales">Salir</button></span>`;
+}
+function practiceMove(d){
+  if(!practice)return;
+  practice.idx=Math.min(Math.max(0,practice.idx+d),practice.list.length-1);savePractice();newScramble();
+}
+function endPractice(msg){practice=null;savePractice();newScramble();if(msg)showToast(msg,false);}
+
+// ---- Conexión con la API pública de la WCA ----
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function wcaGet(path,ms,tries){
+  tries=tries==null?2:tries;
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),ms||25000);
+  let r;
+  try{r=await fetch(WCA_API+path,{signal:ctl.signal,headers:{Accept:'application/json'}});}
+  finally{clearTimeout(t);}
+  if(r.status===404){const e=new Error('404');e.code=404;throw e;}
+  if(r.status===429){
+    // La WCA limita las peticiones seguidas: se espera un poco y se reintenta
+    if(tries>0){const wait=(parseInt(r.headers.get('retry-after'))||0)*1000||(tries===2?4000:10000);await sleep(Math.min(wait,15000));return wcaGet(path,ms,tries-1);}
+    const e=new Error('429');e.code=429;throw e;
+  }
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return await r.json();
+}
+const wcaNetMsg='No se ha podido conectar con la WCA. Comprueba tu conexión e inténtalo de nuevo.';
+const wcaBusyMsg='La WCA está recibiendo demasiadas peticiones ahora mismo. Espera un minuto y vuelve a intentarlo.';
+const wcaErrMsg=e=>e&&e.code===429?wcaBusyMsg:wcaNetMsg;
+function openWca(){
+  const saved=store.get(WCA_ID_KEY,null);
+  if(!wcaS.person&&saved&&validWcaId(saved))loadWcaPerson(saved);
+  else renderWca();
+  $('wcaOverlay').classList.add('active');
+  if(wcaS.view==='id')setTimeout(()=>{const i=$('wcaIdInput');if(i)i.focus();},60);
+}
+async function loadWcaPerson(raw){
+  const id=normWcaId(raw);
+  if(!validWcaId(id)){wcaS.err='Un WCA ID tiene 10 caracteres: 4 números, 4 letras y 2 números (por ejemplo 2017GONZ50).';wcaS.view='id';renderWca();return;}
+  wcaS={...wcaS,id,view:'loading',err:null,loadingMsg:'Buscando tus competiciones…'};renderWca();
+  try{
+    const [person,comps,results]=await Promise.all([wcaGet(`/persons/${id}`),wcaGet(`/persons/${id}/competitions`),wcaGet(`/persons/${id}/results`,40000)]);
+    if(wcaS.id!==id)return;
+    Object.assign(wcaS,{person,comps:competitionsWithResults(comps,results),results,cache:{},view:'comps',filter:''});
+    store.set(WCA_ID_KEY,id);
+  }catch(e){
+    wcaS.view='id';wcaS.err=e.code===404?`No hay ningún competidor con el WCA ID ${id}.`:wcaErrMsg(e);
+  }
+  renderWca();
+}
+async function openWcaComp(compId){
+  const c=wcaS.comps.find(x=>x.id===compId);if(!c)return;
+  Object.assign(wcaS,{comp:c,view:'comp',event:null,round:null,set:null});
+  if(!wcaS.cache[compId]){
+    wcaS.view='loading';wcaS.loadingMsg=`Cargando las mezclas de ${c.name}…`;renderWca();
+    try{
+      const scr=await wcaGet(`/competitions/${encodeURIComponent(compId)}/scrambles`,40000);
+      wcaS.cache[compId]={tree:buildScrambleTree(scr),wcif:null,wcifState:'loading'};
+      // El WCIF (grupos y reglas) puede ser grande: se carga aparte y no bloquea
+      wcaGet(`/competitions/${encodeURIComponent(compId)}/wcif/public`,60000)
+        .then(w=>{const k=wcaS.cache[compId];if(k){k.wcif=w;k.wcifState='ok';if($('wcaOverlay').classList.contains('active')&&wcaS.comp&&wcaS.comp.id===compId)renderWca();}})
+        .catch(()=>{const k=wcaS.cache[compId];if(k){k.wcifState='error';if(wcaS.comp&&wcaS.comp.id===compId)renderWca();}});
+    }catch(e){
+      wcaS.view='comps';wcaS.err=e.code===404?'Esta competición no tiene mezclas publicadas.':wcaErrMsg(e);renderWca();return;
+    }
+    if(!wcaS.comp||wcaS.comp.id!==compId)return;
+    wcaS.view='comp';
+  }
+  const k=wcaS.cache[compId],mine=resultsByRound(wcaS.results,compId);
+  const myEvents=new Set(Object.values(mine).map(r=>r.event_id));
+  const first=k.tree.find(e=>myEvents.has(e.eventId))||k.tree[0];
+  wcaS.event=first?first.eventId:null;
+  renderWca();
+}
+function wcaCtx(){
+  const k=wcaS.comp&&wcaS.cache[wcaS.comp.id];if(!k)return null;
+  const ev=k.tree.find(e=>e.eventId===wcaS.event)||null;
+  const rd=ev&&wcaS.round!=null?ev.rounds.find(r=>String(r.roundId)===String(wcaS.round)):null;
+  const set=rd&&wcaS.set?rd.sets.find(s=>s.group===wcaS.set):null;
+  return{k,ev,rd,set,mine:resultsByRound(wcaS.results,wcaS.comp.id)};
+}
+const fmtDate=d=>{try{return new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});}catch(e){return d;}};
+const flag=iso=>iso&&/^[A-Z]{2}$/.test(iso)?String.fromCodePoint(...[...iso].map(c=>127397+c.charCodeAt(0))):'';
+function officialLine(eventId,r){
+  if(!r)return'';
+  const avg=fmtWcaValue(eventId,r.average,true),best=fmtWcaValue(eventId,r.best,false);
+  const main=r.average&&r.average!==0?`media <b class="mono">${esc(avg)}</b> · mejor <span class="mono">${esc(best)}</span>`:`mejor <b class="mono">${esc(best)}</b>`;
+  return`${main} · puesto ${r.pos}`;
+}
+function officialAttempts(eventId,r){
+  if(!r||!Array.isArray(r.attempts))return'';
+  return r.attempts.filter(v=>v!==0).map((v,i)=>{const t=fmtWcaValue(eventId,v,false);return(i===r.best_index||i===r.worst_index)&&r.average>0&&r.attempts.filter(x=>x!==0).length===5?`(${t})`:t;}).join('  ');
+}
+function renderWca(){
+  const body=$('wcaBody'),head=$('wcaHead');
+  const back=t=>`<button class="icon-btn wca-back" data-go="${t}" title="Volver">‹</button>`;
+  const err=wcaS.err?`<div class="wca-err">${esc(wcaS.err)}</div>`:'';
+  if(wcaS.view==='loading'){
+    head.innerHTML=`<h3>Competiciones WCA</h3>`;
+    body.innerHTML=`<div class="wca-loading"><span class="spin"></span>${esc(wcaS.loadingMsg||'Cargando…')}</div>`;return;
+  }
+  if(wcaS.view==='id'||!wcaS.person){
+    head.innerHTML=`<h3>Practica con tus competiciones</h3>`;
+    body.innerHTML=`<p class="wca-intro">Escribe tu WCA ID y elige una competición en la que hayas participado. Podrás volver a hacer sus <b>mezclas oficiales</b>, de tu ronda o de cualquier otra, e intentar mejorar tu resultado.</p>
+      <form class="wca-form" id="wcaForm"><input id="wcaIdInput" maxlength="10" autocomplete="off" spellcheck="false" placeholder="ej: 2017GONZ50" value="${esc(wcaS.id||'')}"><button class="btn btn-accent" type="submit">Buscar</button></form>
+      ${err}<small class="wca-help">Lo encuentras en tu perfil de worldcubeassociation.org. Los datos se consultan directamente a la WCA y solo se guarda tu WCA ID en este navegador.</small>`;
+    return;
+  }
+  const p=wcaS.person.person||{};
+  if(wcaS.view==='comps'){
+    head.innerHTML=`<h3>Tus competiciones</h3>`;
+    const f=wcaS.filter.trim().toLowerCase();
+    const list=wcaS.comps.filter(c=>!f||(c.name+' '+(c.city||'')+' '+c.start_date).toLowerCase().includes(f));
+    body.innerHTML=`<div class="wca-person"><div><b>${esc(p.name||wcaS.id)}</b> ${flag(p.country_iso2)}<div class="wca-sub">${esc(wcaS.id)} · ${wcaS.comps.length} ${plural(wcaS.comps.length,'competición','competiciones')}</div></div><button class="mini-btn" data-go="id">Cambiar</button></div>
+      ${err}<input class="wca-search" id="wcaSearch" placeholder="Buscar competición…" value="${esc(wcaS.filter)}" autocomplete="off">
+      <div class="wca-list">${list.map(c=>`<button class="wca-item" data-comp="${esc(c.id)}"><span><b>${esc(c.name)}</b><span class="wca-sub">${esc(fmtDate(c.start_date))}${c.city?' · '+esc(c.city):''}</span></span><span class="chev">›</span></button>`).join('')||'<div class="wca-empty">No hay competiciones que coincidan.</div>'}</div>`;
+    return;
+  }
+  const ctx=wcaCtx();if(!ctx){wcaS.view='comps';renderWca();return;}
+  const c=wcaS.comp,{k,ev,rd,set,mine}=ctx;
+  if(wcaS.view==='comp'){
+    head.innerHTML=`${back('comps')}<div><h3>${esc(c.name)}</h3><div class="wca-sub">${esc(fmtDate(c.start_date))}${c.city?' · '+esc(c.city):''}</div></div>`;
+    if(!k.tree.length){body.innerHTML=`<div class="wca-empty">La WCA no tiene publicadas las mezclas de esta competición. Suele pasar en competiciones antiguas.</div>`;return;}
+    const myEv=new Set(Object.values(mine).map(r=>r.event_id));
+    const chips=k.tree.map(e=>`<button class="wca-chip${e.eventId===wcaS.event?' on':''}${myEv.has(e.eventId)?' mine':''}" data-ev="${e.eventId}">${esc(e.name)}${myEv.has(e.eventId)?' ★':''}</button>`).join('');
+    let rounds='';
+    if(ev){
+      rounds=ev.rounds.map(r=>{
+        const res=mine[r.roundId];
+        const pg=k.wcif?probableGroup(k.wcif,wcaS.id,ev.eventId,r.index,r.sets.length):null;
+        const sets=r.sets.map(st=>`<button class="wca-set${pg&&pg.letter===st.group?' mine':''}" data-round="${r.roundId}" data-set="${esc(st.group)}">${esc(st.group)}${pg&&pg.letter===st.group?'<small>tu grupo</small>':''}</button>`).join('');
+        const you=res?`<div class="wr-res">Tu resultado: ${officialLine(ev.eventId,res)}</div><div class="wr-atts mono">${esc(officialAttempts(ev.eventId,res))}</div>`:`<div class="wr-res muted">${myEv.has(ev.eventId)?'No llegaste a esta ronda':'No participaste en esta categoría'}</div>`;
+        const grp=pg?`<div class="wr-grp">Compitiste en el grupo ${pg.number}${pg.letter?` → mezclas ${pg.letter} (probable)`:''}</div>`:'';
+        return`<div class="wr-round"><div class="wr-head"><b>${esc(r.label)}</b><span class="wca-sub">${r.sets.length} ${plural(r.sets.length,'grupo','grupos')} de mezclas</span></div>${you}${grp}<div class="wr-sets">${sets}</div></div>`;
+      }).join('');
+    }
+    const wcifNote=k.wcifState==='loading'?'<div class="wca-note"><span class="spin sm"></span>Buscando en qué grupo compitió…</div>':k.wcifState==='error'?'<div class="wca-note">No se ha podido saber en qué grupo compitió.</div>':'';
+    body.innerHTML=`${err}<div class="wca-chips">${chips}</div>${wcifNote}<p class="wca-hint">Elige un grupo de mezclas (A, B, C…) para practicar.</p>${rounds}`;
+    return;
+  }
+  if(wcaS.view==='set'&&ev&&rd&&set){
+    const res=mine[rd.roundId],cat=ev.cat,C=WCA[cat];
+    const pg=k.wcif?probableGroup(k.wcif,wcaS.id,ev.eventId,rd.index,rd.sets.length):null;
+    const rules=k.wcif?wcifRoundRules(k.wcif,ev.eventId,rd.index):null;
+    head.innerHTML=`${back('comp')}<div><h3>${esc(ev.name)} · ${esc(rd.label)} · Grupo ${esc(set.group)}</h3><div class="wca-sub">${esc(c.name)}</div></div>`;
+    const lines=set.scrambles.map(x=>`<li><span class="n">${x.num}</span><span class="scr">${esc(x.scramble)}</span></li>`).join('')+
+      (wcaS.extras?set.extras.map(x=>`<li class="extra"><span class="n">E${x.num}</span><span class="scr">${esc(x.scramble)}</span></li>`).join(''):'');
+    const F=COMP_FMT[C.fmt],repeatable=F&&set.scrambles.length===F.n;
+    let why='';
+    if(!F)why='En Multi-BLD solo está la práctica libre.';
+    else if(!repeatable)why=`Para repetir la ronda hacen falta ${F.n} mezclas y este grupo tiene ${set.scrambles.length}.`;
+    else if(comp)why='Termina o abandona la ronda que tienes en curso para empezar otra.';
+    const info=[];
+    if(res)info.push(`Tu resultado oficial en esta ronda: ${officialLine(ev.eventId,res)}`);
+    if(pg)info.push(pg.letter===set.group?'Según el horario, este fue <b>tu grupo</b> (probable).':`Según el horario compitió en el grupo ${pg.number}${pg.letter?` (mezclas ${pg.letter})`:''}.`);
+    if(rules&&F){
+      const r2=[];
+      if(rules.cutoff)r2.push(`corte ${fmtWcaValue(ev.eventId,rules.cutoff.value)} en ${rules.cutoff.attempts} ${plural(rules.cutoff.attempts,'intento','intentos')}`);
+      if(rules.limit)r2.push(`límite ${fmtWcaValue(ev.eventId,rules.limit)} por intento`);
+      if(rules.cumulative)r2.push('límite acumulado (no se aplica aquí)');
+      if(r2.length)info.push('Reglas oficiales: '+r2.join(' · ')+'.');
+    }
+    body.innerHTML=`${err}${info.length?`<div class="wca-info">${info.map(x=>`<div>${x}</div>`).join('')}</div>`:''}
+      <ol class="wca-scr">${lines}</ol>
+      ${set.extras.length?`<label class="wca-extra"><input type="checkbox" id="wcaExtras" ${wcaS.extras?'checked':''}> Incluir ${set.extras.length} ${plural(set.extras.length,'mezcla extra','mezclas extra')} en la práctica libre</label>`:''}
+      <div class="wca-actions">
+        <button class="btn btn-outline" id="wcaFree">Practicar libre</button>
+        <button class="btn btn-accent" id="wcaRepeat" ${repeatable&&!comp?'':'disabled'}>🏆 Repetir la ronda</button>
+      </div>
+      <small class="wca-help">${why?esc(why)+' ':''}<b>Libre:</b> pasas las mezclas a tu ritmo. <b>Repetir la ronda:</b> modo competición con estas mezclas${res?' y el objetivo de mejorar tu resultado oficial':''}${rules&&(rules.cutoff||rules.limit)?', con el corte y el límite oficiales':''}.</small>`;
+    return;
+  }
+  wcaS.view='comp';renderWca();
+}
+function wcaSource(includeExtras){
+  const ctx=wcaCtx();if(!ctx||!ctx.ev||!ctx.rd||!ctx.set)return null;
+  const{ev,rd,set,mine,k}=ctx,isMbld=ev.cat==='mbld';
+  const fix=t=>isMbld?t.split('\n').filter(Boolean).map((l,i)=>`${i+1}. ${l.trim()}`).join('\n'):t;
+  const list=set.scrambles.map(x=>({num:x.num,scramble:fix(x.scramble)}));
+  if(includeExtras)set.extras.forEach(x=>list.push({num:x.num,scramble:fix(x.scramble),extra:true}));
+  const res=mine[rd.roundId]||null;
+  const pg=k.wcif?probableGroup(k.wcif,wcaS.id,ev.eventId,rd.index,rd.sets.length):null;
+  return{compId:wcaS.comp.id,compName:wcaS.comp.name,eventId:ev.eventId,cat:ev.cat,roundLabel:rd.label,roundIndex:rd.index,group:'Grupo '+set.group,
+    list,mine:!!(pg&&pg.letter===set.group),
+    official:res?{best:res.best,average:res.average,attempts:res.attempts,pos:res.pos,best_index:res.best_index,worst_index:res.worst_index}:null,
+    rules:k.wcif?wcifRoundRules(k.wcif,ev.eventId,rd.index):null};
+}
+function switchToCat(cat){
+  if(curCat===cat)return;
+  cancelTimer();curCat=cat;$('category').value=cat;store.set('ekitimer-cat',cat);selMode=false;sel.clear();
+  updateCatUI();refreshAll();
+}
+function startWcaPractice(){
+  const src=wcaSource(wcaS.extras);if(!src)return;
+  if(comp){showToast('Termina o abandona la ronda en curso primero',false);return;}
+  practice={...src,idx:0,done:{}};savePractice();
+  $('wcaOverlay').classList.remove('active');
+  switchToCat(src.cat);newScramble();resetTimerDisplay();
+  showToast(`Practicando ${src.list.length} mezclas oficiales`,false);
+}
+function startWcaRound(from){
+  const src=from||wcaSource(false);if(!src||comp)return;
+  const F=COMP_FMT[WCA[src.cat].fmt];if(!F||src.list.length!==F.n)return;
+  practice=null;savePractice();
+  $('wcaOverlay').classList.remove('active');
+  switchToCat(src.cat);cancelTimer();
+  const ru=src.rules||{};
+  let cutoff=null,cutN=null,limit=null;
+  if(ru.cutoff&&ru.cutoff.attempts<F.n){cutoff=ru.cutoff.value;cutN=ru.cutoff.attempts;}
+  if(ru.limit&&!isFmc(src.cat))limit=ru.limit;
+  comp={id:uid(),cat:src.cat,fmt:WCA[src.cat].fmt,target:officialTarget(src.official,F.type),cutoff,cutN,limit,attempts:[],start:new Date().toISOString(),done:false,wca:src};
+  undoBuf=null;save();refreshAll();updateCompUI();newScramble();
+  $('timer').textContent=WCA[src.cat].noTimer?'—':'0.00';tClass(WCA[src.cat].noTimer?'muted':'idle');
+  $('hint').textContent=idleHint();
+}
+/** Notas del resultado de una ronda repetida: comparación con la competición. */
+function wcaRoundNotes(r){
+  const w=r.wca,o=w.official,F=compF(r),out=[];
+  if(!o){out.push(`<div>No participaste en esta ronda: no hay resultado oficial con el que comparar.</div>`);return out;}
+  const off=F.type==='bo'?o.best:o.average;
+  const offTxt=fmtWcaValue(w.eventId,off,F.type!=='bo');
+  if(r.cutFail||r.result==null){out.push(`<div>En la competición: <b>${esc(offTxt)}</b></div>`);return out;}
+  if(off>0&&r.result!==Infinity){
+    const d=r.result-off,dt=isFmc(r.cat)?(Math.abs(d)/100).toFixed(F.type==='bo'?0:2):fmt(Math.abs(d)/100,true);
+    if(d<0)out.push(`<div class="ok">🎉 Has mejorado tu ${esc(offTxt)} oficial en ${esc(dt)}</div>`);
+    else if(d===0)out.push(`<div>Igual que en la competición (${esc(offTxt)})</div>`);
+    else out.push(`<div class="bad">${esc(dt)} peor que tu ${esc(offTxt)} oficial</div>`);
+  }else out.push(`<div>En la competición: <b>${esc(offTxt)}</b></div>`);
+  out.push(`<div class="muted">En la competición: <span class="mono">${esc(officialAttempts(w.eventId,{...o}))}</span></div>`);
+  return out;
+}
+function openPracticeSummary(){
+  if(!practice)return;
+  const p=practice,ids=p.list.map((_,i)=>p.done&&p.done[i]).filter(Boolean);
+  const ss=ids.map(id=>solves.find(s=>s.id===id)).filter(Boolean);
+  const F=COMP_FMT[WCA[p.cat].fmt];
+  let avgTxt='';
+  if(F&&ss.length===F.n&&F.type!=='bo'){
+    const u=ss.map(s=>unitsOf(s.category,s.time,s.penalty)),r=roundResult(u,F.type);
+    avgTxt=`<div class="big">Tu ${F.short} con estas mezclas: <b class="mono">${esc(fmtU(p.cat,r,true))}</b></div>`;
+    if(p.official&&p.official.average>0&&r!==Infinity){
+      const d=r-p.official.average,dt=isFmc(p.cat)?(Math.abs(d)/100).toFixed(2):fmt(Math.abs(d)/100,true);
+      avgTxt+=d<0?`<div class="ok">🎉 ${esc(dt)} mejor que tu ${esc(fmtWcaValue(p.eventId,p.official.average,true))} oficial</div>`:d>0?`<div class="bad">${esc(dt)} peor que tu ${esc(fmtWcaValue(p.eventId,p.official.average,true))} oficial</div>`:'<div>Igual que tu resultado oficial</div>';
+    }
+  }
+  $('wcaHead').innerHTML='<h3>¡Mezclas terminadas!</h3>';
+  $('wcaBody').innerHTML=`<p class="wca-sub">${esc(p.compName)} · ${esc(WCA[p.cat].name)} · ${esc(p.roundLabel)} · ${esc(p.group)}</p>
+    <ol class="wca-scr res">${p.list.map((x,i)=>{const s=p.done&&p.done[i]&&solves.find(z=>z.id===p.done[i]);return`<li${x.extra?' class="extra"':''}><span class="n">${x.extra?'E'+x.num:x.num}</span><span class="scr">${esc(x.scramble.split('\n')[0])}${x.scramble.includes('\n')?'…':''}</span><b class="mono">${s?esc(disp(s)):'—'}</b></li>`;}).join('')}</ol>
+    <div class="cp-info">${avgTxt}${p.official?`<div class="muted">En la competición: <span class="mono">${esc(officialAttempts(p.eventId,p.official))}</span></div>`:''}</div>
+    <div class="wca-actions"><button class="btn btn-outline" id="wcaSumExit">Terminar</button><button class="btn btn-accent" id="wcaSumAgain">Repetir estas mezclas</button></div>`;
+  $('wcaOverlay').classList.add('active');
+}
+
+function setupWca(){
+  $('wcaBtn').addEventListener('click',openWca);
+  $('wcaClose').addEventListener('click',()=>$('wcaOverlay').classList.remove('active'));
+  $('wcaOverlay').addEventListener('submit',e=>{if(e.target.id==='wcaForm'){e.preventDefault();loadWcaPerson($('wcaIdInput').value);}});
+  $('wcaOverlay').addEventListener('input',e=>{
+    if(e.target.id==='wcaIdInput'){const v=e.target.value.toUpperCase();if(v!==e.target.value)e.target.value=v;}
+    if(e.target.id==='wcaSearch'){
+      wcaS.filter=e.target.value;const f=wcaS.filter.trim().toLowerCase();
+      let n=0;document.querySelectorAll('#wcaBody .wca-item').forEach(b=>{const m=!f||b.textContent.toLowerCase().includes(f);b.hidden=!m;if(m)n++;});
+      const em=$('wcaBody').querySelector('.wca-empty');if(em)em.hidden=n>0;
+    }
+  });
+  $('wcaOverlay').addEventListener('change',e=>{if(e.target.id==='wcaExtras'){wcaS.extras=e.target.checked;renderWca();}});
+  $('wcaOverlay').addEventListener('click',e=>{
+    const t=e.target.closest('[data-go],[data-comp],[data-ev],[data-set],#wcaFree,#wcaRepeat,#wcaSumExit,#wcaSumAgain');if(!t)return;
+    wcaS.err=null;
+    if(t.dataset.go){
+      if(t.dataset.go==='id'){wcaS.person=null;wcaS.view='id';renderWca();setTimeout(()=>{const i=$('wcaIdInput');if(i){i.focus();i.select();}},50);}
+      else{wcaS.view=t.dataset.go;renderWca();}
+    }
+    else if(t.dataset.comp)openWcaComp(t.dataset.comp);
+    else if(t.dataset.ev){wcaS.event=t.dataset.ev;renderWca();}
+    else if(t.dataset.set){wcaS.round=t.dataset.round;wcaS.set=t.dataset.set;wcaS.view='set';renderWca();$('wcaBody').scrollTop=0;}
+    else if(t.id==='wcaFree')startWcaPractice();
+    else if(t.id==='wcaRepeat')startWcaRound();
+    else if(t.id==='wcaSumExit'){$('wcaOverlay').classList.remove('active');endPractice('Práctica terminada');}
+    else if(t.id==='wcaSumAgain'){$('wcaOverlay').classList.remove('active');practice.idx=0;practice.done={};savePractice();newScramble();}
+  });
+  $('wcaBar').addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;
+    if(b.id==='wbPrev')practiceMove(-1);else if(b.id==='wbNext')practiceMove(1);else if(b.id==='wbExit')endPractice('Has vuelto a las mezclas normales');
+  });
+}
+
 // ====== MODALES ======
-const OVERLAYS=['modalOverlay','detailOverlay','compOverlay','roundOverlay','dataOverlay'];
+const OVERLAYS=['modalOverlay','detailOverlay','compOverlay','roundOverlay','dataOverlay','wcaOverlay'];
 const anyModalOpen=()=>OVERLAYS.some(id=>$(id).classList.contains('active'));
 function closeAllModals(){OVERLAYS.forEach(id=>$(id).classList.remove('active'));detailId=null;roundView=null;}
 
@@ -1133,7 +1473,7 @@ function applySettingsUI(){
 function saveSettings(){store.set('ekitimer-settings',settings);applySettingsUI();}
 
 // ====== VERSIÓN Y APP INSTALABLE ======
-const APP_VERSION='1.0.0';
+const APP_VERSION='1.1.0';
 function registerSW(){
   if(!('serviceWorker'in navigator)||!/^https?:$/.test(location.protocol))return;
   window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
@@ -1161,7 +1501,7 @@ function setTab(t){
 }
 function init(){
   setTheme(store.get('ekitimer-theme','cream'));
-  loadData();
+  loadData();loadPractice();
   Object.keys(WCA).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=WCA[k].name;$('category').appendChild(o);});
   $('category').value=curCat;
   $('mbldCount').value=mbldN;
@@ -1176,6 +1516,7 @@ function init(){
   $('category').addEventListener('change',()=>{
     if(comp){$('category').value=curCat;return;}
     cancelTimer();curCat=$('category').value;store.set('ekitimer-cat',curCat);$('category').blur();
+    if(practice&&practice.cat!==curCat){practice=null;savePractice();showToast('Práctica con mezclas oficiales terminada',false);}
     selMode=false;sel.clear();
     updateCatUI();newScramble();refreshAll();
   });
@@ -1253,7 +1594,10 @@ function init(){
   });
   $('rClose').addEventListener('click',()=>{$('roundOverlay').classList.remove('active');roundView=null;});
   $('rCopy').addEventListener('click',()=>{const r=rounds.find(x=>x.id===roundView);if(r)copyText(roundShareText(r),'Resultado copiado');});
-  $('rAgain').addEventListener('click',()=>{$('roundOverlay').classList.remove('active');roundView=null;openCompSetup();});
+  $('rAgain').addEventListener('click',()=>{
+    const r=rounds.find(x=>x.id===roundView);$('roundOverlay').classList.remove('active');roundView=null;
+    if(r&&r.wca)startWcaRound(r.wca);else openCompSetup();
+  });
   $('rDelete').addEventListener('click',()=>{
     const id=roundView;$('roundOverlay').classList.remove('active');roundView=null;
     const snap=snapshot();rounds=rounds.filter(r=>r.id!==id);
@@ -1294,6 +1638,7 @@ function init(){
   // Almacenamiento
   if(!storageOK)showBanner('Este navegador no permite guardar datos (¿modo privado?). Tus tiempos se perderán al cerrar: descarga una copia antes de irte.',true);
   try{if(storageOK&&navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
+  setupWca();
   setupTimer();
   $('appVersion').textContent='v'+APP_VERSION;
   registerSW();

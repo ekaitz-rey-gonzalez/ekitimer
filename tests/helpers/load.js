@@ -1,4 +1,4 @@
-// Carga los scripts del navegador que no usan el DOM para probarlos en Node.
+// Carga los scripts del navegador que no usan el DOM (puzzles, core y wca) para probarlos en Node.
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -9,11 +9,14 @@ const EXPORTS = [
   'skewbState', 'skewbPuzzle', 'simClock', 'sq1State', 'megaPuzzle', 'megaState',
   // core.js
   'unitsOf', 'COMP_FMT', 'roundResult', 'trimmedIdx', 'cutoffFailed', 'bpaWpa', 'needFor',
-  'csScrToCat', 'csEvName', 'parseCsTimer', 'parseCSV', 'parseTwisty', 'detectImport', 'planImport', 'sigOf'
+  'csScrToCat', 'csEvName', 'parseCsTimer', 'parseCSV', 'parseTwisty', 'detectImport', 'planImport', 'sigOf',
+  // wca.js
+  'WCA_EVENTS', 'wcaRound', 'wcaEventName', 'normWcaId', 'validWcaId', 'buildScrambleTree', 'fmtWcaValue', 'decodeMbf',
+  'resultsByRound', 'competitionsWithResults', 'probableGroup', 'wcifRoundRules', 'officialTarget'
 ];
 
 function load() {
-  const src = ['js/puzzles.js', 'js/core.js']
+  const src = ['js/puzzles.js', 'js/core.js', 'js/wca.js']
     .map(f => fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/^'use strict';$/m, ''))
     .join('\n');
   // Se ejecuta dentro de una función: las constantes de los scripts quedan en su ámbito, sin tocar el global.

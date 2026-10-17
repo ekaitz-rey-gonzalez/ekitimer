@@ -1,6 +1,6 @@
 {
   "name": "ekitimer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Timer de speedcubing con scrambles WCA, simulador de rondas de competición e importación desde csTimer y Twisty Timer.",
   "private": true,
   "license": "GPL-3.0-or-later",

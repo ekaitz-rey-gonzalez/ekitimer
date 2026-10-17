@@ -18,7 +18,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ekaitz-rey-gonzalez/ekitimer/actions/workflows/deploy.yml"><img src="https://github.com/ekaitz-rey-gonzalez/ekitimer/actions/workflows/deploy.yml/badge.svg" alt="Estado de las pruebas y la publicación"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-GPL--3.0-blue" alt="Licencia GPL-3.0"></a>
 </p>
 
@@ -28,6 +27,7 @@
 
 csTimer, CubeDesk o Twisty Timer son geniales para cronometrar. EKITIMER se centra en lo que más piden los cubers en los foros y casi ningún timer resuelve bien:
 
+- ⭐ **Vuelve a tus competiciones.** Escribe tu WCA ID, elige una competición y repite sus **mezclas oficiales**, las de tu grupo o las de cualquier otra ronda, intentando mejorar tu resultado oficial.
 - 🏆 **Simulador de rondas WCA.** Haz una Ao5 de verdad, con inspección obligatoria, corte y límite de tiempo. Antes del último intento te dice **qué tiempo necesitas** para bajar de tu objetivo, con el mismo redondeo que usa la WCA.
 - 📦 **Tus datos nunca se pierden.** Copia de seguridad en un clic, restauración sin duplicados e **importación desde csTimer, Twisty Timer y Cubic Timer**.
 - 📱 **Se instala como una app** en el móvil o el ordenador, funciona **sin internet** y mantiene la pantalla encendida mientras entrenas.
@@ -46,6 +46,24 @@ csTimer, CubeDesk o Twisty Timer son geniales para cronometrar. EKITIMER se cent
 4. Al terminar tienes la media con los tiempos descartados entre paréntesis, si lograste el objetivo y si es tu mejor ronda, y puedes copiar el resultado para compartirlo.
 
 Cada evento usa su formato oficial: **media de 5** en la mayoría, **media de 3** en 6×6, 7×7 y FMC, y **mejor de 3** en las modalidades a ciegas. Todas tus rondas quedan guardadas en la pestaña **Rondas**.
+
+## Practica con tus competiciones WCA
+
+<p align="center">
+  <img src="docs/screenshots/wca.png" width="49%" alt="Rondas y grupos de una competición con tu resultado oficial">
+  <img src="docs/screenshots/wca-practica.png" width="49%" alt="Practicando con las mezclas oficiales">
+</p>
+
+1. Pulsa **WCA** y escribe tu WCA ID (por ejemplo `2017GONZ50`). EKITIMER lo recuerda para la próxima vez.
+2. Elige una de **tus competiciones** y una categoría. Las categorías en las que participaste llevan ★.
+3. En cada ronda ves **tu resultado oficial** con tus cinco tiempos y **en qué grupo compitiste**, y eliges un juego de mezclas (A, B, C…), el tuyo o cualquier otro.
+4. Puedes practicar de dos formas:
+   - **Libre:** pasas las mezclas a tu ritmo, puedes ir adelante y atrás, e incluir las mezclas extra. Al terminar te compara con tu resultado oficial.
+   - **Repetir la ronda:** el modo competición con esas mezclas, el formato oficial y, si la competición los publicó, el mismo corte y límite de tiempo. **El objetivo es mejorar tu resultado oficial.**
+
+Cada tiempo queda marcado con la mezcla oficial que usaste: competición, ronda, grupo y número.
+
+Los datos son los que publica la propia WCA y se consultan en el momento: no hace falta cuenta y en EKITIMER solo se guarda tu WCA ID. La WCA publica en qué grupo competiste, pero no qué juego de mezclas usó ese grupo, así que se marca como «tu grupo (probable)», porque normalmente el grupo 1 usa las mezclas A, el 2 las B, etc. En competiciones antiguas a veces no está publicado el grupo.
 
 ## Todas las funciones
 
@@ -109,7 +127,7 @@ Los eventos que EKITIMER no tiene (FTO, relevos…) se indican en el resumen y n
 
 ## Tus datos y tu privacidad
 
-Tus tiempos se guardan **solo en tu navegador**. No se envían a ningún servidor. La única conexión externa es para descargar los scrambles oficiales, las fuentes y, si exportas, la librería de Excel.
+Tus tiempos se guardan **solo en tu navegador**. No se envían a ningún servidor. Las únicas conexiones externas son para descargar los scrambles, las fuentes, la librería de Excel si exportas y, si usas el apartado **WCA**, los datos públicos de tus competiciones desde la API de la WCA.
 
 Como los datos son locales, descarga una **copia de seguridad** de vez en cuando (EKITIMER te lo recuerda con un punto naranja en **Datos**). Con ese archivo puedes recuperar todo en otro navegador o dispositivo.
 
@@ -131,6 +149,7 @@ index.html            Página de la app
 css/styles.css        Estilos y temas
 js/puzzles.js         Categorías WCA, scrambles y simulación de los puzzles (sin DOM)
 js/core.js            Rondas WCA, cálculos e importadores (sin DOM)
+js/wca.js             Datos públicos de la WCA: competiciones, mezclas, grupos y reglas (sin DOM)
 js/app.js             Interfaz: timer, competición, datos y ajustes
 sw.js                 Service worker (uso sin conexión)
 manifest.webmanifest  App instalable
@@ -146,12 +165,13 @@ npx playwright install chromium
 npm run test:e2e        # pruebas de navegador (escritorio y móvil)
 ```
 
-Cada push a `main` pasa las pruebas y, si todo está en verde, se publica automáticamente en GitHub Pages. Si quieres colaborar, lee [CONTRIBUTING.md](CONTRIBUTING.md).
+La web se publica con GitHub Pages desde la rama `main`. Si quieres colaborar, lee [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Créditos
 
 - Scrambles de estado aleatorio: [cubing.js](https://github.com/cubing/cubing.js), de Lucas Garron y colaboradores.
 - Formato de las vistas de Square-1, inspirado en [TNoodle](https://github.com/thewca/tnoodle-lib), el programa oficial de scrambles de la WCA.
+- Competiciones, resultados y mezclas oficiales: [API pública de la World Cube Association](https://www.worldcubeassociation.org/).
 - Formatos de importación compatibles con [csTimer](https://github.com/cs0x7f/cstimer) y [Twisty Timer](https://github.com/aricneto/TwistyTimer).
 - Exportación a Excel con [SheetJS](https://sheetjs.com/).
 - Tipografías: Barlow Condensed, IBM Plex Mono y Nunito (Google Fonts).

@@ -2,6 +2,16 @@
 
 Todos los cambios importantes de EKITIMER. El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones siguen [SemVer](https://semver.org/lang/es/).
 
+## [1.1.0] — 2026-10-17
+
+### Añadido
+- **Practica con tus competiciones WCA:** escribe tu WCA ID, elige una competición, categoría, ronda y grupo, y repite sus mezclas oficiales.
+  - Muestra tu resultado oficial en cada ronda (con tus tiempos) y el grupo en el que compitió, marcado como probable.
+  - **Práctica libre** con las mezclas en orden, adelante y atrás, mezclas extra opcionales y resumen comparado con tu resultado oficial.
+  - **Repetir la ronda** en modo competición con las mezclas oficiales, el corte y el límite de tiempo de la competición y el objetivo de mejorar tu resultado oficial.
+  - Cada tiempo guarda de qué mezcla oficial es: competición, ronda, grupo y número.
+  - Si la WCA limita las peticiones, se reintenta automáticamente y, si no puede, avisa.
+
 ## [1.0.0] — 2026-10-11
 
 Primera versión pública.
@@ -17,4 +27,4 @@ Primera versión pública.
 - Las 17 categorías WCA, con BLD, FMC y Multi-BLD.
 - Deshacer (`Ctrl+Z`) para cualquier borrado o cambio.
 - Exportación a Excel con columnas numéricas y hoja de rondas.
-- Pruebas automáticas (Node y Playwright) y publicación continua en GitHub Pages.
+- Pruebas automáticas (Node y Playwright) y web publicada en GitHub Pages.
